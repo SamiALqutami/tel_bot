@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدير البوتات السحابي</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root { --bg: var(--tg-theme-bg-color, #fff); --text: var(--tg-theme-text-color, #000); --btn: var(--tg-theme-button-color, #3390ec); }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 15px; margin: 0; }
+        .card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        input, textarea { width: 100%; box-sizing: border-box; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; background: var(--bg); color: var(--text); }
+        textarea { height: 150px; font-family: monospace; font-size: 12px; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #fff; }
+        .btn-up { background: var(--btn); }
+        .btn-stop { background: #e74c3c; }
+        .btn-start { background: #2ecc71; }
+        .file-label { display: block; padding: 10px; background: #f39c12; color: white; text-align: center; border-radius: 8px; margin-bottom: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h3>🚀 استضافة بوت جديد</h3>
+        <input type="text" id="token" placeholder="توكن البوت (Bot Token)">
+        
+        <label class="file-label">
+            📂 رفع ملف (.py)
+            <input type="file" id="fileInput" accept=".py" style="display: none;" onchange="readFile()">
+        </label>
+
+        <textarea id="code" placeholder="أو اكتب الكود هنا مباشرة..."></textarea>
+        
+        <button class="btn-up" onclick="sendAction('upload')">رفع وتشغيل البوت</button>
+    </div>
+
+    <div class="card">
+        <h3>⚙️ التحكم بالبوت</h3>
+        <p style="font-size: 12px; opacity: 0.7;">أدخل التوكن أعلاه للتحكم</p>
+        <div class="btn-group">
+            <button class="btn-stop" onclick="sendAction('stop')">إيقاف ⏸️</button>
+            <button class="btn-start" onclick="sendAction('start')">تشغيل ▶️</button>
+            <button style="background:#555" onclick="sendAction('delete')">حذف 🗑️</button>
+        </div>
+    </div>
+
+    <p id="log" style="text-align: center; color: var(--btn);"></p>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // قراءة الملف المرفوع وتحويله لنص في المحرر
+        function readFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('code').value = e.target.result;
+                    document.getElementById('log').innerText = "تم قراءة الملف: " + file.name;
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        async function sendAction(action) {
+            const token = document.getElementById("token").value;
+            const code = document.getElementById("code").value;
+            const log = document.getElementById("log");
+            
+            // رابط الباك إند (يجب تغييره بعد الرفع)
+            const backendUrl = "https://tel-j7gyzzbcc-samis-projects-c89fb7e6.vercel.app";
+
+            if (!token) { tg.showAlert("أدخل التوكن أولاً"); return; }
+            if (action === 'upload' && !code) { tg.showAlert("أين الكود؟"); return; }
+
+            log.innerText = "جاري المعالجة...";
+
+            try {
+                const res = await fetch(backendUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action, token, code })
+                });
+                const data = await res.json();
+                
+                if (data.status === "success") {
+                    tg.showPopup({ title: "نجاح", message: data.msg });
+                    log.innerText = data.msg;
+                } else {
+                    tg.showAlert("خطأ: " + data.msg);
+                }
+            } catch (e) {
+                tg.showAlert("فشل الاتصال: " + e);
+            }
+        }
+    </script>
+</body>
+</html>
