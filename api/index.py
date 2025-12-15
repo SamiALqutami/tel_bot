@@ -7,7 +7,7 @@ import traceback
 
 app = Flask(__name__)
 
-# --- الإعدادات (تؤخذ من متغيرات البيئة) ---
+# --- الدادات (تؤخذ من متغيرات البيئة) ---
 # احصل عليها من موقع Upstash.com (مجاني)
 REDIS_URL = os.environ.get('rediss://default:AUgwAAIncDExZDk4NjZmM2YyY2Q0YzI0YjFmZjk0NjBkNDg3NDA3MnAxMTg0ODA@neutral-muskox-18480.upstash.io:6379') 
 # توكن البوت الأساسي (المضيف)
