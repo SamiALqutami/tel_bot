@@ -4,14 +4,16 @@ import os
 import redis
 import json
 import traceback
+from flask_cors import CORS # 👈 1. استيراد مكتبة CORS
 
 app = Flask(__name__)
+CORS(app) # 👈 2. تفعيل CORS على مستوى التطبيق
 
 # --- الدادات (تؤخذ من متغيرات البيئة) ---
-# احصل عليها من موقع Upstash.com (مجاني)
-REDIS_URL = os.environ.get('rediss://default:AUgwAAIncDExZDk4NjZmM2YyY2Q0YzI0YjFmZjk0NjBkNDg3NDA3MnAxMTg0ODA@neutral-muskox-18480.upstash.io:6379') 
-# توكن البوت الأساسي (المضيف)
-ADMIN_BOT_TOKEN = os.environ.get('8352316200:AAHujChoBx7shlgBXJrOTLB7i9h9qtq_cMI')
+# ملاحظة: يجب تعريف هذه المتغيرات (UPSTASH_REDIS_URL و ADMIN_BOT_TOKEN) في إعدادات Vercel (Environment Variables)
+
+REDIS_URL = os.environ.get('UPSTASH_REDIS_URL') # 👈 تم تغيير القيمة إلى اسم المفتاح
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN') # 👈 تم تغيير القيمة إلى اسم المفتاح
 
 # الاتصال بقاعدة البيانات السريعة
 r = redis.from_url(REDIS_URL) if REDIS_URL else None
@@ -24,6 +26,7 @@ def set_webhook(token, host_url):
     webhook_url = f"{host_url}/webhook/{token}"
     url = f"{TELEGRAM_API}{token}/setWebhook"
     try:
+        # إرسال طلب Webhook
         requests.post(url, json={"url": webhook_url})
         return True
     except:
@@ -36,8 +39,7 @@ def delete_webhook(token):
 # --- واجهة تنفيذ الكود (Sandbox) ---
 def execute_bot_logic(token, code, update):
     """
-    هنا السحر: نقوم بتنفيذ كود المستخدم ونمرر له أدوات جاهزة
-    بما في ذلك كائن Redis ليتمكن من صنع بوتات دردشة عشوائية
+    تنفيذ كود المستخدم بأمان وتمرير أدوات جاهزة
     """
     try:
         # دوال مساعدة تحقن داخل كود المستخدم
@@ -63,6 +65,7 @@ def execute_bot_logic(token, code, update):
         return True
     except Exception as e:
         print(f"Error in user bot {token}: {e}")
+        # يمكنك هنا إضافة لوج (Log) إلى قاعدة البيانات أو نظام مراقبة
         return False
 
 # --- المسارات (Routes) ---
@@ -74,19 +77,23 @@ def control_panel():
     action = data.get('action') # upload, start, stop, delete
     token = data.get('token')
     
-    if not token or not r:
-        return jsonify({"status": "error", "msg": "Database Error or Missing Token"})
+    # تم تغيير التحقق الأولي ليكون أوضح
+    if not token:
+        return jsonify({"status": "error", "msg": "Missing Bot Token"})
+    if not r:
+        return jsonify({"status": "error", "msg": "Database Connection Error (Check UPSTASH_REDIS_URL)"})
 
     key_code = f"bot:{token}:code"
     key_status = f"bot:{token}:status"
 
+    # ... (بقية منطق التحكم لم يتغير) ...
+
     if action == "upload":
         code = data.get('code')
-        # حفظ الكود في Redis (سريع جداً)
         r.set(key_code, code)
         r.set(key_status, "active")
-        # تفعيل الويب هوك
-        set_webhook(token, f"https://{request.host}")
+        # استخدام طلب.المضيف (request.host) لضمان استخدام النطاق الصحيح
+        set_webhook(token, f"https://{request.host}") 
         return jsonify({"status": "success", "msg": "تم رفع البوت وتشغيله!"})
 
     elif action == "stop":
@@ -114,14 +121,16 @@ def handle_bot_webhook(subpath):
     update = request.json
     
     if not r:
-        return "DB Error", 500
+        # رسالة خطأ واضحة في حالة عدم اتصال Redis
+        return "DB Error", 500 
 
     # 1. التحقق هل البوت موجود ونشط؟
     status = r.get(f"bot:{user_token}:status")
+    # يجب التحقق من حالة البايت ثم فك التشفير
     if not status or status.decode('utf-8') != "active":
         return "Bot Stopped", 200
 
-    # 2. جلب الكود من الذاكرة (سريع جداً - مللي ثانية)
+    # 2. جلب الكود من الذاكرة
     code = r.get(f"bot:{user_token}:code")
     if not code:
         return "No Code", 200
@@ -133,4 +142,9 @@ def handle_bot_webhook(subpath):
 
 @app.route('/')
 def home():
+    # هذا المسار يثبت أن التطبيق يعمل
     return "🚀 Telegram Bot Hosting Engine is Running (Vercel + Redis)"
+
+# إذا كنت تستخدم gunicorn أو Vercel في وضع التطوير المحلي
+if __name__ == '__main__':
+    app.run(debug=True)
