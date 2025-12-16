@@ -10,9 +10,10 @@
         body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 15px; margin: 0; }
         .card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         input, textarea { width: 100%; box-sizing: border-box; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; background: var(--bg); color: var(--text); }
-        textarea { height: 150px; font-family: monospace; font-size: 12px; }
+        textarea { height: 150px; font-family: monospace; font-size: 12px; direction: ltr; }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #fff; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #fff; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
         .btn-up { background: var(--btn); }
         .btn-stop { background: #e74c3c; }
         .btn-start { background: #2ecc71; }
@@ -45,13 +46,12 @@
         </div>
     </div>
 
-    <p id="log" style="text-align: center; color: var(--btn);"></p>
+    <p id="log" style="text-align: center; color: var(--text); font-size: 14px;"></p>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // قراءة الملف المرفوع وتحويله لنص في المحرر
         function readFile() {
             const file = document.getElementById('fileInput').files[0];
             if (file) {
@@ -59,42 +59,60 @@
                 reader.onload = function(e) {
                     document.getElementById('code').value = e.target.result;
                     document.getElementById('log').innerText = "تم قراءة الملف: " + file.name;
+                    document.getElementById('log').style.color = "green";
                 };
                 reader.readAsText(file);
             }
         }
 
         async function sendAction(action) {
-            const token = document.getElementById("token").value;
+            const token = document.getElementById("token").value.trim();
             const code = document.getElementById("code").value;
             const log = document.getElementById("log");
             
-            // رابط الباك إند (يجب تغييره بعد الرفع)
-            const backendUrl = "https://tel-j7gyzzbcc-samis-projects-c89fb7e6.vercel.app";
+            // 🔴 هام: استبدل الرابط أدناه برابط مشروعك على فيرسل بعد الرفع
+            // مثال: https://project-name.vercel.app
+            // لا تضع /api/control هنا، سيتم إضافته في الكود
+            const baseUrl = "https://YOUR-VERCEL-PROJECT-URL.vercel.app"; 
 
             if (!token) { tg.showAlert("أدخل التوكن أولاً"); return; }
             if (action === 'upload' && !code) { tg.showAlert("أين الكود؟"); return; }
+            if (baseUrl.includes("YOUR-VERCEL")) { tg.showAlert("تنبيه: لم تقم بتحديث رابط السيرفر في ملف index.html"); return; }
 
-            log.innerText = "جاري المعالجة...";
+            log.innerText = "جاري الاتصال بالسيرفر...";
+            log.style.color = "orange";
 
             try {
-                const res = await fetch(backendUrl, {
+                // التصحيح: إضافة المسار الصحيح للرابط
+                const res = await fetch(baseUrl + "/api/control", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action, token, code })
                 });
+
+                if (!res.ok) {
+                    throw new Error(`Server Error: ${res.status}`);
+                }
+
                 const data = await res.json();
                 
                 if (data.status === "success") {
                     tg.showPopup({ title: "نجاح", message: data.msg });
                     log.innerText = data.msg;
+                    log.style.color = "green";
                 } else {
-                    tg.showAlert("خطأ: " + data.msg);
+                    tg.showAlert("خطأ من السيرفر: " + data.msg);
+                    log.innerText = "خطأ: " + data.msg;
+                    log.style.color = "red";
                 }
             } catch (e) {
-                tg.showAlert("فشل الاتصال: " + e);
+                tg.showAlert("فشل الاتصال: " + e.message);
+                log.innerText = "خطأ في الاتصال: " + e.message;
+                log.style.color = "red";
+                console.error(e);
             }
         }
     </script>
 </body>
 </html>
+ 
